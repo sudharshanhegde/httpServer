@@ -33,12 +33,15 @@ void log_request(const char *client_ip, const char *method, const char *path, in
 }
 
 void log_msg(const char *level, const char *fmt, ...){
+    va_list args;
     struct timespec ts;
     struct tm tm_result;
     char timebuf[64];
     clock_gettime(CLOCK_REALTIME, &ts);
     gmtime_r(&ts.tv_sec, &tm_result);
+    pthread_mutex_lock(&g_log_mutex);
     strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M:%S", &tm_result);
+    fprintf(g_log_file,"[%s] [%s]",timebuf,level);
     va_start(args,fmt);
     vfprintf(g_log_file, fmt, args);
     va_end(args);
