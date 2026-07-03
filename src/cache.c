@@ -105,3 +105,71 @@ void cache_destroy(struct lru_cache *cache) {
     pthread_mutex_destroy(&cache -> mutex);
     log_msg("INFO", "LRU cache is destroyed.");
 }
+
+bool cache_get(struct lru_cache *cache, const char *path, char **out_data, size_t *out_size) {
+    pthread_mutex_lock(&cache -> mutex);
+    unsigned int bucket = hash_path(path);
+    struct cache_node *node = cache -> buckets[bucket];
+    while(node) {
+        if(strcmp(node->path, path) == 0) {
+            node -> last_accessed = time(NULL);
+            list_move_to_head(cache,node);
+            *out_data = node -> data;
+            *out_size = node -> size;
+            pthread_mutex_unlock(&cache -> mutex);
+            return true;
+        }
+        node = node -> hash_next;
+    }
+    pthread_mutex_unlock(&cache -> mutex);
+    return false;
+}
+
+void cache_put(struct lru_cache *cache, const char *path, const char *data, size_t size)
+{
+    pthread_mutex_lock(&cache->mutex);
+    unsigned int bucket = hash_path(path);
+    struct cache_node *node = cache->buckets[bucket];
+    while(node) {
+        if(strcmp(node->path, path) == 0) {
+            free(node->data);
+            node->data = (char *) data;
+            node->size = size;
+            node->last_accessed = time(NULL);
+            list_move_to_head(cache, node);
+            pthread_mutex_unlock(&cache->mutex);
+            return;
+        }
+        node = node->hash_next;
+    }
+    while (cache->num_entries >= cache->max_entries || cache->current_size + size > cache->max_size) {
+        if(cache->num_entries == 0) {
+            break;
+        }
+        evict_lru(cache);
+    }
+    if(size > cache->max_size) {
+        pthread_mutex_unlock(&cache->mutex);
+        log_msg("DEBUG","File %s is too large for cache (%zu bytes to be exact)",path,size);
+        return;
+    }
+
+    struct cache_node *new_node = malloc(sizeof(struct cache_node));
+    if(!new_node) {
+        pthread_mutex_unlock(&cache->mutex);
+        log_msg("ERROR","Failed to allocate cache node for %s", path);
+        return;
+    }
+    strncpy(new_node->path, path, MAX_PATH - 1);
+    new_node->path[MAX_PATH-1] = '\0';
+    new_node->data = (char *) data;
+    new_node->size = size;
+    new_node->last_accessed = time(NULL);
+
+    new_node->hash_next = cache->buckets[bucket];
+    cache->buckets[bucket] = new_node;
+    list_insert_head(cache, new_node);
+    cache->current_size += size;
+    cache->num_entries++;
+    pthread_mutex_unlock(&cache->mutex);
+}
