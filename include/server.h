@@ -173,10 +173,6 @@ enum http_parse_status http_parser_feed(struct http_parser *p, const char *buf, 
 void http_parse_request(struct client_info *client, struct http_request *req);
 const char *http_method_str(enum http_method method);
 
-void file_serve(struct client_info *client, struct http_request *req, struct http_response *resp);
-void http_send_response(int client_fd, struct http_response *resp, bool head_only);
-const char *mime_type(const char *path);
-
 void signal_handler(int sig);
 void setup_signal_handlers(void);
 

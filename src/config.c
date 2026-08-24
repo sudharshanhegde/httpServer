@@ -11,7 +11,7 @@ static char *trim_whitespace(char *str) {
         return str;
     }
     end = str + strlen(str) - 1;
-    while(end > str && (*end == ' ' || end == '\t' || end == '\r' || end == '\n'))
+    while(end > str && (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n'))
     {
         end--;
     }

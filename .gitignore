@@ -7,5 +7,17 @@ tests/bin/test_hash_table
 tests/bin/test_lru_cache
 tests/bin/test_reactor
 tests/bin/test_thread_pool
+tests/bin/test_integration
 SKILL.md
 PROGRESS.md
+obj/reactor.o
+obj/lru_cache.o
+obj/thread_pool.o
+obj/main.o
+obj/logger.o
+obj/http_parser.o
+obj/hash_table.o
+obj/config.o
+obj/cache.o
+logs/server.log
+bin/httpd
