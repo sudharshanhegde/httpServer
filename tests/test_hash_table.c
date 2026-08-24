@@ -1,5 +1,5 @@
 /*
- * test_hash_table.c - Checkpoint 2 end-to-end tests for the generic
+ * test_hash_table.c - End-to-end tests for the generic
  * open-addressing hash table (src/hash_table.c).
  *
  * The table is generic and thread-agnostic, so these tests are deterministic

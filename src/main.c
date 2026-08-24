@@ -1,6 +1,6 @@
 /*
  * main.c - Entry point that wires the worker pool + reactor + sendfile data
- * plane into a runnable server (Checkpoint 7: integration).
+ * plane into a runnable server.
  *
  * Loads the configuration file, initializes logging, starts the dynamically
  * tuned worker pool, and runs until SIGINT/SIGTERM triggers a clean shutdown

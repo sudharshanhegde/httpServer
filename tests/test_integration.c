@@ -1,5 +1,5 @@
 /*
- * test_integration.c - Checkpoint 7 end-to-end integration test.
+ * test_integration.c - End-to-end integration test.
  *
  * This wires the real modules together and drives a running pool with real
  * socket clients: full request lifecycle (GET / HEAD / keep-alive / 404 /

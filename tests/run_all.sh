@@ -21,7 +21,7 @@ echo "==> Building and running tests..."
 # ---------------------------------------------------------------
 # Checkpoint 1: HTTP/1.1 state-machine parser
 # ---------------------------------------------------------------
-echo "    [1/6] http_parser"
+echo "    [1/7] http_parser"
 CC="${CC:-gcc}"
 "$CC" $WARN_FLAGS $SAN_FLAGS -I"$ROOT/include" \
     "$ROOT/tests/test_http_parser.c" "$ROOT/src/http_parser.c" \
@@ -31,7 +31,7 @@ CC="${CC:-gcc}"
 # ---------------------------------------------------------------
 # Checkpoint 2: generic open-addressing hash table
 # ---------------------------------------------------------------
-echo "    [2/6] hash_table"
+echo "    [2/7] hash_table"
 "$CC" $WARN_FLAGS $SAN_FLAGS -I"$ROOT/src" \
     "$ROOT/tests/test_hash_table.c" "$ROOT/src/hash_table.c" \
     -o "$TEST_BIN_DIR/test_hash_table"
@@ -40,7 +40,7 @@ echo "    [2/6] hash_table"
 # ---------------------------------------------------------------
 # Checkpoint 3: thread-safe LRU cache on the hash table
 # ---------------------------------------------------------------
-echo "    [3/6] lru_cache"
+echo "    [3/7] lru_cache"
 "$CC" $WARN_FLAGS $SAN_FLAGS -D_GNU_SOURCE -pthread -I"$ROOT/src" \
     "$ROOT/tests/test_lru_cache.c" "$ROOT/src/lru_cache.c" "$ROOT/src/hash_table.c" \
     -o "$TEST_BIN_DIR/test_lru_cache"
@@ -49,7 +49,7 @@ echo "    [3/6] lru_cache"
 # ---------------------------------------------------------------
 # Checkpoint 4: edge-triggered epoll reactor (real socket, real client)
 # ---------------------------------------------------------------
-echo "    [4/6] reactor"
+echo "    [4/7] reactor"
 "$CC" $WARN_FLAGS $SAN_FLAGS -D_GNU_SOURCE -pthread -I"$ROOT/include" -I"$ROOT/src" \
     "$ROOT/tests/test_reactor.c" "$ROOT/src/reactor.c" "$ROOT/src/http_parser.c" \
     -o "$TEST_BIN_DIR/test_reactor"
@@ -58,7 +58,7 @@ echo "    [4/6] reactor"
 # ---------------------------------------------------------------
 # Checkpoint 5: dynamically tuned worker pool (SO_REUSEPORT reactors)
 # ---------------------------------------------------------------
-echo "    [5/6] thread_pool"
+echo "    [5/7] thread_pool"
 "$CC" $WARN_FLAGS $SAN_FLAGS -D_GNU_SOURCE -pthread -I"$ROOT/include" -I"$ROOT/src" \
     "$ROOT/tests/test_thread_pool.c" "$ROOT/src/thread_pool.c" "$ROOT/src/reactor.c" \
     "$ROOT/src/http_parser.c" \
@@ -68,11 +68,20 @@ echo "    [5/6] thread_pool"
 # ---------------------------------------------------------------
 # Checkpoint 7: integration (lifecycle + concurrency + soak + config/logger)
 # ---------------------------------------------------------------
-echo "    [6/6] integration"
+echo "    [6/7] integration"
 "$CC" $WARN_FLAGS $SAN_FLAGS -D_GNU_SOURCE -pthread -I"$ROOT/include" -I"$ROOT/src" \
     "$ROOT/tests/test_integration.c" "$ROOT/src/config.c" "$ROOT/src/logger.c" \
     "$ROOT/src/thread_pool.c" "$ROOT/src/reactor.c" "$ROOT/src/http_parser.c" \
     -o "$TEST_BIN_DIR/test_integration"
 "$TEST_BIN_DIR/test_integration"
+
+# ---------------------------------------------------------------
+# Checkpoint 8: hardening - fuzz the parser under ASan/UBSan
+# ---------------------------------------------------------------
+echo "    [7/7] parser_fuzz"
+"$CC" $WARN_FLAGS $SAN_FLAGS -I"$ROOT/include" \
+    "$ROOT/tests/test_parser_fuzz.c" "$ROOT/src/http_parser.c" \
+    -o "$TEST_BIN_DIR/test_parser_fuzz"
+"$TEST_BIN_DIR/test_parser_fuzz"
 
 echo "==> All tests passed."

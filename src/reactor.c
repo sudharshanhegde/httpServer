@@ -3,9 +3,9 @@
  *
  * Edge-triggered (EPOLLET) semantics: after an EPOLLIN event we read until
  * EAGAIN (fully drain the socket), and after an EPOLLOUT event we write until
- * EAGAIN. A request may arrive across many read()s; the incremental parser
- * (Checkpoint 1) is fed one byte at a time so that on completion we know
- * exactly how many bytes belong to the request and can carry any pipelined
+ * EAGAIN. A request may arrive across many read()s; the incremental parser is
+ * fed one byte at a time so that on completion we know exactly how many bytes
+ * belong to the request and can carry any pipelined
  * remainder into the next request on a keep-alive connection. Partial writes
  * are tracked per connection (write offset) and the socket is re-armed for
  * EPOLLOUT until the whole response is flushed.

@@ -1,5 +1,5 @@
 /*
- * test_thread_pool.c - Checkpoint 5 end-to-end tests for the dynamically tuned
+ * test_thread_pool.c - End-to-end tests for the dynamically tuned
  * worker pool (src/thread_pool.c).
  *
  * A pool of per-thread SO_REUSEPORT reactors runs on a real ephemeral port.

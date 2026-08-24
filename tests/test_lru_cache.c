@@ -1,5 +1,5 @@
 /*
- * test_lru_cache.c - Checkpoint 3 end-to-end tests for the thread-safe LRU
+ * test_lru_cache.c - End-to-end tests for the thread-safe LRU
  * cache (src/lru_cache.c).
  *
  * The single-threaded logic (eviction order, capacity accounting, stats,

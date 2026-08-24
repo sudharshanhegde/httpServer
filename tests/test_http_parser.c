@@ -1,5 +1,5 @@
 /*
- * test_http_parser.c - Checkpoint 1 end-to-end tests for the incremental
+ * test_http_parser.c - End-to-end tests for the incremental
  * HTTP/1.1 parser (src/http_parser.c).
  *
  * The parser is pure logic with no sockets/threads, so we exercise it with

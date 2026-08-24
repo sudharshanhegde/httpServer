@@ -1,6 +1,8 @@
 CC := gcc
 
-CFLAGS := -Wall -Wextra -O2 -g -D_GNU_SOURCE -pthread
+# The project treats warnings as errors; keep the server build as strict as the
+# sanitized test gate. Override with e.g. `make CFLAGS=...` if needed.
+CFLAGS := -Wall -Wextra -Werror -O2 -g -D_GNU_SOURCE -pthread
 
 INCLUDES := -Iinclude
 

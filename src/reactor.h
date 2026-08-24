@@ -1,15 +1,12 @@
 /*
  * reactor.h - Single-threaded, edge-triggered epoll HTTP reactor.
  *
- * This is Checkpoint 4: a non-blocking event loop that accepts connections,
- * reads requests incrementally (edge-triggered: drain until EAGAIN), parses
- * them with the Checkpoint 1 state machine, and writes responses handling
- * partial writes and keep-alive. It is deliberately single-threaded — the
- * worker pool (Checkpoint 5) will distribute connections/events on top of it.
- *
- * The body-transmission path here is a naive read()+write() into memory; the
- * sendfile() zero-copy data plane (Checkpoint 6) replaces that strategy behind
- * the same reactor structure.
+ * A non-blocking event loop that accepts connections, reads requests
+ * incrementally (edge-triggered: drain until EAGAIN), parses them with the
+ * HTTP state machine, and writes responses handling partial writes and
+ * keep-alive. Each reactor runs on its own thread; the worker pool distributes
+ * connections across several of them. The body is transmitted zero-copy with
+ * sendfile() directly from the file to the socket.
  */
 
 #ifndef REACTOR_H

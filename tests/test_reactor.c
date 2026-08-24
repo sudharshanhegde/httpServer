@@ -1,5 +1,5 @@
 /*
- * test_reactor.c - Checkpoint 4 end-to-end tests for the edge-triggered epoll
+ * test_reactor.c - End-to-end tests for the edge-triggered epoll
  * reactor (src/reactor.c).
  *
  * The reactor is started in a background thread bound to a real ephemeral
@@ -306,7 +306,7 @@ static void test_concurrent_connections(void)
 }
 
 /*
- * Checkpoint 6: validate the sendfile() data plane by serving an 8 MiB file
+ * Validate the sendfile() data plane by serving an 8 MiB file
  * and verifying Content-Length and every body byte match what was written.
  */
 static void test_large_file_sendfile(void)

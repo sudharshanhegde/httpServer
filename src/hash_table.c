@@ -3,7 +3,7 @@
  *
  * Open addressing with linear probing, tombstones for deletion, and automatic
  * growth (rehash) past a load-factor threshold. This module is pure logic and
- * single-threaded by design — the LRU checkpoint layers locking on top of it.
+ * single-threaded by design — the LRU layer adds locking on top of it.
  */
 
 #include "hash_table.h"

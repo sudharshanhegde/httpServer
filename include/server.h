@@ -165,7 +165,7 @@ enum http_parse_status http_parser_feed(struct http_parser *p, const char *buf, 
  * of whatever bytes are available. On success sets req->parsed = true; on an
  * incomplete or malformed read leaves req->parsed = false. This is not a
  * substitute for the incremental http_parser_feed() when a request may arrive
- * across multiple read()s (see the reactor checkpoint).
+ * across multiple read()s (the reactor feeds it incrementally).
  *
  * @client: Client whose read_buf/read_len hold the bytes to parse.
  * @req:    Caller-owned request struct to fill (zeroed here).

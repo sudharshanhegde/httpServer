@@ -1,8 +1,8 @@
 /*
  * thread_pool.h - Dynamically tuned worker pool over per-thread epoll reactors.
  *
- * Checkpoint 5: the single-threaded reactor (Checkpoint 4) is wrapped in a pool
- * that distributes incoming connections across several worker threads. Each
+ * The single-threaded reactor is wrapped in a pool that distributes incoming
+ * connections across several worker threads. Each
  * worker owns its own reactor (its own epoll instance + its own listen socket),
  * and all workers share one port via SO_REUSEPORT so the kernel spreads
  * connections among them.

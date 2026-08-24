@@ -7,8 +7,7 @@
  * malformed input with HTTP_PARSE_ERROR rather than overrunning a buffer.
  *
  * Parsing is pure logic: no sockets, no threads, no I/O. That makes it the
- * safest and fastest component to test in isolation, which is why it is the
- * foundation checkpoint of this project.
+ * safest and fastest component to test in isolation.
  */
 
 #include "server.h"

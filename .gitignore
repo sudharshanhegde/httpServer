@@ -2,12 +2,15 @@ include/.gitkeep
 logs/.gitkeep
 src/.gitkeep
 www/.gitkeep
+obj/
+bin/
 tests/bin/test_http_parser
 tests/bin/test_hash_table
 tests/bin/test_lru_cache
 tests/bin/test_reactor
 tests/bin/test_thread_pool
 tests/bin/test_integration
+tests/bin/test_parser_fuzz
 SKILL.md
 PROGRESS.md
 obj/reactor.o

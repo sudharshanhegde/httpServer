@@ -4,8 +4,8 @@
  * A reusable, thread-agnostic key/value map with no knowledge of what the keys
  * or values are: the caller supplies a hash function and an equality function,
  * and the table stores raw void* keys and values (which it never frees — the
- * caller owns them). It is the storage layer the LRU cache (Checkpoint 3) is
- * built on, but is deliberately generic so it can be unit-tested in isolation.
+ * caller owns them). It is the storage layer the LRU cache is built on, but is
+ * deliberately generic so it can be unit-tested in isolation.
  *
  * Open addressing with linear probing; deleted slots become tombstones; the
  * table grows (rehashing) once the load factor climbs past a threshold.
@@ -42,8 +42,7 @@ struct ht_slot {
  *
  * Callers must initialize with ht_init() (or ht_create()) and destroy with
  * ht_destroy(). All fields except @slots are bookkeeping; treat the struct as
- * opaque outside this module. Not thread-safe: the LRU checkpoint layers a
- * lock on top.
+ * opaque outside this module. Not thread-safe: the LRU layer adds locking.
  */
 struct hash_table {
     struct ht_slot *slots;
