@@ -99,27 +99,6 @@ struct thread_pool {
     volatile bool shutdown;
 };
 
-struct cache_node {
-    char path[MAX_PATH];
-    char *data;
-    size_t size;
-    time_t last_accessed;
-    struct cache_node *prev;
-    struct cache_node *next;
-    struct cache_node *hash_next;
-};
-
-struct lru_cache {
-    struct cache_node *buckets[1024];
-    struct cache_node *head;
-    struct cache_node *tail;
-    size_t current_size;
-    size_t max_size;
-    int num_entries;
-    int max_entries;
-    pthread_mutex_t mutex;
-};
-
 extern struct server_config g_config;
 extern struct thread_pool g_pool;
 extern struct lru_cache g_cache;
@@ -137,11 +116,6 @@ void config_print(const struct server_config *cfg);
 void thread_pool_init(struct thread_pool *pool, int num_threads);
 void thread_pool_destroy(struct thread_pool *pool);
 void thread_pool_enqueue(struct thread_pool *pool, struct client_info *client);
-
-void cache_init(struct lru_cache *cache);
-void cache_destroy(struct lru_cache *cache);
-bool cache_get(struct lru_cache *cache, const char *path, char **out_data, size_t *out_size);
-void cache_put(struct lru_cache *cache, const char* path, const char *data, size_t size);
 
 /**
  * enum http_parse_status - Result of feeding bytes into an HTTP parser.

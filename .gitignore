@@ -4,5 +4,6 @@ src/.gitkeep
 www/.gitkeep
 tests/bin/test_http_parser
 tests/bin/test_hash_table
+tests/bin/test_lru_cache
 SKILL.md
 PROGRESS.md
