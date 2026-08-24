@@ -143,6 +143,82 @@ void cache_destroy(struct lru_cache *cache);
 bool cache_get(struct lru_cache *cache, const char *path, char **out_data, size_t *out_size);
 void cache_put(struct lru_cache *cache, const char* path, const char *data, size_t size);
 
+/**
+ * enum http_parse_status - Result of feeding bytes into an HTTP parser.
+ *
+ * HTTP_PARSE_INCOMPLETE means more bytes are needed; call http_parser_feed()
+ * again with the next chunk. HTTP_PARSE_DONE means the full request
+ * (including the terminating blank line) has been parsed into the request
+ * struct. HTTP_PARSE_ERROR means the input was malformed and the request must
+ * be rejected with a 400; the parser state is unusable afterwards.
+ */
+enum http_parse_status {
+    HTTP_PARSE_INCOMPLETE = 0,
+    HTTP_PARSE_DONE = 1,
+    HTTP_PARSE_ERROR = -1
+};
+
+/**
+ * struct http_parser - Incremental HTTP/1.1 request-line + header state machine.
+ *
+ * Callers own the struct, initialize it with http_parser_init(), then feed it
+ * arbitrary byte chunks (including a header split across multiple feeds, or
+ * one byte at a time) until it returns HTTP_PARSE_DONE or HTTP_PARSE_ERROR.
+ */
+struct http_parser {
+    struct http_request *req;   /* caller-owned request being filled */
+    int state;                  /* internal state-machine state */
+    size_t path_pos;            /* write cursor into req->path */
+    size_t query_pos;           /* write cursor into req->query_string */
+    size_t version_pos;         /* write cursor into req->version */
+    char method_tmp[16];        /* scratch buffer for the method token */
+    size_t method_len;          /* bytes written into method_tmp */
+    size_t name_len;            /* bytes written into the current header name */
+    size_t value_pos;           /* offset where a header value starts (after "Name: ") */
+    size_t value_len;           /* bytes written into the current header value */
+    bool host_seen;             /* a Host header was parsed */
+    bool done;                  /* blank line seen; parse finished */
+};
+
+/**
+ * http_parser_init - Bind a fresh parser to a zeroed request struct.
+ *
+ * @p:   Uninitialized parser to reset.
+ * @req: Caller-owned request struct to fill; should be zeroed by the caller.
+ */
+void http_parser_init(struct http_parser *p, struct http_request *req);
+
+/**
+ * http_parser_feed - Feed a byte chunk into the parser state machine.
+ *
+ * Feed as much or as little of the request as you have. Returns
+ * HTTP_PARSE_INCOMPLETE if more bytes are needed, HTTP_PARSE_DONE once the
+ * terminating blank line has been consumed (the request struct is fully
+ * populated and req->parsed is set), or HTTP_PARSE_ERROR on malformed input
+ * (empty request line, non-token method, oversized field, missing Host on
+ * HTTP/1.1, unterminated header block). Once DONE or ERROR is returned the
+ * parser is finished; do not feed it again.
+ *
+ * @p:   Initialized parser from http_parser_init().
+ * @buf: Byte buffer containing the next chunk of the request.
+ * @len: Number of bytes in @buf.
+ *
+ * Returns: HTTP_PARSE_DONE, HTTP_PARSE_INCOMPLETE, or HTTP_PARSE_ERROR.
+ */
+enum http_parse_status http_parser_feed(struct http_parser *p, const char *buf, size_t len);
+
+/**
+ * http_parse_request - Parse a buffered client read into a request struct.
+ *
+ * Convenience wrapper for callers that read once and want a single-shot parse
+ * of whatever bytes are available. On success sets req->parsed = true; on an
+ * incomplete or malformed read leaves req->parsed = false. This is not a
+ * substitute for the incremental http_parser_feed() when a request may arrive
+ * across multiple read()s (see the reactor checkpoint).
+ *
+ * @client: Client whose read_buf/read_len hold the bytes to parse.
+ * @req:    Caller-owned request struct to fill (zeroed here).
+ */
 void http_parse_request(struct client_info *client, struct http_request *req);
 const char *http_method_str(enum http_method method);
 

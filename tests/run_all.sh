@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# run_all.sh - CI-less local test runner.
+#
+# Compiles and runs every per-checkpoint test binary under the address and
+# undefined-behavior sanitizers. Each checkpoint appends its own build/run
+# lines to this script; it is never replaced wholesale.
+#
+# A test exits nonzero on failure, so `set -e` aborts the whole run at the
+# first red test (which is exactly what we want: fix it, don't bury it).
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TEST_BIN_DIR="$ROOT/tests/bin"
+mkdir -p "$TEST_BIN_DIR"
+
+SAN_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -g"
+WARN_FLAGS="-Wall -Wextra -Wpedantic -Werror"
+
+echo "==> Building and running tests..."
+
+# ---------------------------------------------------------------
+# Checkpoint 1: HTTP/1.1 state-machine parser
+# ---------------------------------------------------------------
+echo "    [1/1] http_parser"
+CC="${CC:-gcc}"
+"$CC" $WARN_FLAGS $SAN_FLAGS -I"$ROOT/include" \
+    "$ROOT/tests/test_http_parser.c" "$ROOT/src/http_parser.c" \
+    -o "$TEST_BIN_DIR/test_http_parser"
+"$TEST_BIN_DIR/test_http_parser"
+
+echo "==> All tests passed."
