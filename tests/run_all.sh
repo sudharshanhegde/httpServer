@@ -21,11 +21,20 @@ echo "==> Building and running tests..."
 # ---------------------------------------------------------------
 # Checkpoint 1: HTTP/1.1 state-machine parser
 # ---------------------------------------------------------------
-echo "    [1/1] http_parser"
+echo "    [1/2] http_parser"
 CC="${CC:-gcc}"
 "$CC" $WARN_FLAGS $SAN_FLAGS -I"$ROOT/include" \
     "$ROOT/tests/test_http_parser.c" "$ROOT/src/http_parser.c" \
     -o "$TEST_BIN_DIR/test_http_parser"
 "$TEST_BIN_DIR/test_http_parser"
+
+# ---------------------------------------------------------------
+# Checkpoint 2: generic open-addressing hash table
+# ---------------------------------------------------------------
+echo "    [2/2] hash_table"
+"$CC" $WARN_FLAGS $SAN_FLAGS -I"$ROOT/src" \
+    "$ROOT/tests/test_hash_table.c" "$ROOT/src/hash_table.c" \
+    -o "$TEST_BIN_DIR/test_hash_table"
+"$TEST_BIN_DIR/test_hash_table"
 
 echo "==> All tests passed."
