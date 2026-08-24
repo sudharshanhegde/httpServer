@@ -37,6 +37,13 @@ enum conn_state {
     ST_CLOSED
 };
 
+/* Response transmission phases. */
+enum resp_phase {
+    RSP_HEAD = 0,    /* flushing the response head (headers, maybe inline body) */
+    RSP_SENDFILE,    /* zero-copy sendfile() of the file body */
+    RSP_DONE         /* nothing left to send */
+};
+
 struct conn {
     int fd;
     enum conn_state state;
@@ -51,10 +58,15 @@ struct conn {
     struct http_parser parser;
     struct http_request req;
 
-    /* Output: whole response buffer and how much has been sent. */
-    char *resp;
-    size_t resp_len;
-    size_t resp_off;
+    /* Output: response head buffer (headers, plus inline body for simple
+     * responses), then an optional file body streamed via sendfile(). */
+    enum resp_phase phase;
+    char *head;          /* malloc'd head block; freed once fully written */
+    size_t head_len;
+    size_t head_off;     /* bytes of head already written */
+    int file_fd;         /* file to sendfile(), or -1 */
+    off_t file_off;      /* current sendfile offset */
+    off_t file_len;      /* bytes remaining in the file */
 };
 
 struct reactor {
@@ -87,15 +99,18 @@ static void conn_close(struct reactor *r, struct conn *c)
 {
     epoll_ctl(r->epfd, EPOLL_CTL_DEL, c->fd, NULL);
     close(c->fd);
-    if (c->resp) {
-        free(c->resp);
+    if (c->head) {
+        free(c->head);
+    }
+    if (c->file_fd >= 0) {
+        close(c->file_fd);
     }
     r->conns[c->fd] = NULL;
     free(c);
     __atomic_sub_fetch(&r->active_conns, 1, __ATOMIC_RELAXED);
 }
 
-/* ---- response building (naive read()+write(); sendfile comes at C6) ------ */
+/* ---- response building (sendfile() zero-copy data plane) ----------------- */
 
 static const char *status_reason(int code)
 {
@@ -166,7 +181,8 @@ static char *build_head(int code, const char *ctype, size_t content_length,
     return buf;
 }
 
-/* Set a simple status-only response (e.g. an error page). */
+/* Set a simple status-only response (e.g. an error page), sent entirely from
+ * the head buffer. */
 static void respond_simple(struct conn *c, int code, const char *ctype, const char *body)
 {
     size_t blen = strlen(body);
@@ -183,39 +199,18 @@ static void respond_simple(struct conn *c, int code, const char *ctype, const ch
     memcpy(buf, head, hlen);
     free(head);
     memcpy(buf + hlen, body, blen);
-    c->resp = buf;
-    c->resp_len = hlen + blen;
-    c->resp_off = 0;
+    c->head = buf;
+    c->head_len = hlen + blen;
+    c->head_off = 0;
+    c->file_fd = -1;
+    c->phase = RSP_HEAD;
 }
 
-/* Read a whole regular file into a malloc'd buffer; returns true on success. */
-static bool read_whole_file(int fd, size_t size, char **out, size_t *out_len)
-{
-    char *buf = malloc(size);
-    if (!buf) {
-        return false;
-    }
-    size_t off = 0;
-    while (off < size) {
-        ssize_t n = read(fd, buf + off, size - off);
-        if (n < 0) {
-            if (errno == EINTR) {
-                continue;
-            }
-            free(buf);
-            return false;
-        }
-        if (n == 0) {
-            break; /* short read: file shrank; serve what we got */
-        }
-        off += (size_t)n;
-    }
-    *out = buf;
-    *out_len = off;
-    return true;
-}
-
-/* Build a file response (or an error if the path is invalid). */
+/*
+ * Build a file response (or an error if the path is invalid). The response
+ * head is buffered in memory; the body is served zero-copy with sendfile()
+ * directly from the file descriptor to the socket.
+ */
 static void respond_file(struct conn *c, const char *doc_root, const char *path)
 {
     /* Reject path traversal outright. */
@@ -258,38 +253,18 @@ static void respond_file(struct conn *c, const char *doc_root, const char *path)
         return;
     }
 
+    c->head = head;
+    c->head_len = hlen;
+    c->head_off = 0;
+    c->phase = RSP_HEAD;
     if (head_only) {
-        c->resp = head;
-        c->resp_len = hlen;
-        c->resp_off = 0;
+        c->file_fd = -1;
         close(fd);
-        return;
+    } else {
+        c->file_fd = fd;
+        c->file_off = 0;
+        c->file_len = st.st_size;
     }
-
-    char *body;
-    size_t blen;
-    if (!read_whole_file(fd, (size_t)st.st_size, &body, &blen)) {
-        close(fd);
-        free(head);
-        respond_simple(c, HTTP_INTERNAL_ERROR, "text/plain", "500 Internal Server Error\n");
-        return;
-    }
-    close(fd);
-
-    char *buf = malloc(hlen + blen);
-    if (!buf) {
-        free(head);
-        free(body);
-        respond_simple(c, HTTP_INTERNAL_ERROR, "text/plain", "500 Internal Server Error\n");
-        return;
-    }
-    memcpy(buf, head, hlen);
-    free(head);
-    memcpy(buf + hlen, body, blen);
-    free(body);
-    c->resp = buf;
-    c->resp_len = hlen + blen;
-    c->resp_off = 0;
 }
 
 static void build_response(struct reactor *r, struct conn *c)
@@ -375,25 +350,60 @@ static void conn_read(struct reactor *r, struct conn *c)
 
 static void conn_write(struct reactor *r, struct conn *c)
 {
-    while (c->resp_off < c->resp_len) {
-        ssize_t n = write(c->fd, c->resp + c->resp_off, c->resp_len - c->resp_off);
-        if (n > 0) {
-            c->resp_off += (size_t)n;
-        } else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-            mod_events(r, c, EPOLLOUT); /* wait for writability, resume later */
-            return;
-        } else if (n < 0 && errno == EINTR) {
-            continue;
-        } else {
-            conn_close(r, c);
-            return;
+    /* Phase 1: flush the response head (headers, plus any inline body). */
+    if (c->phase == RSP_HEAD) {
+        while (c->head_off < c->head_len) {
+            ssize_t n = write(c->fd, c->head + c->head_off, c->head_len - c->head_off);
+            if (n > 0) {
+                c->head_off += (size_t)n;
+            } else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                mod_events(r, c, EPOLLOUT); /* wait for writability, resume later */
+                return;
+            } else if (n < 0 && errno == EINTR) {
+                continue;
+            } else {
+                conn_close(r, c);
+                return;
+            }
         }
+        free(c->head);
+        c->head = NULL;
+        c->head_off = c->head_len = 0;
+        c->phase = (c->file_fd >= 0) ? RSP_SENDFILE : RSP_DONE;
     }
 
-    /* Response fully flushed. */
-    free(c->resp);
-    c->resp = NULL;
-    c->resp_len = c->resp_off = 0;
+    /* Phase 2: sendfile() the file body directly to the socket. */
+    if (c->phase == RSP_SENDFILE) {
+        while (c->file_off < c->file_len) {
+            off_t remaining = c->file_len - c->file_off;
+            size_t count = (size_t)remaining;
+            if (count > (size_t)0x7ffff000) { /* keep each call modest */
+                count = (size_t)0x7ffff000;
+            }
+            ssize_t n = sendfile(c->fd, c->file_fd, &c->file_off, count);
+            if (n < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    mod_events(r, c, EPOLLOUT);
+                    return;
+                }
+                if (errno == EINTR) {
+                    continue;
+                }
+                close(c->file_fd);
+                c->file_fd = -1;
+                conn_close(r, c);
+                return;
+            }
+            /* n > 0: sendfile advanced c->file_off; loop to send the rest. */
+        }
+        close(c->file_fd);
+        c->file_fd = -1;
+        c->phase = RSP_DONE;
+    }
+
+    if (c->phase != RSP_DONE) {
+        return;
+    }
 
     if (!c->keep_alive) {
         conn_close(r, c);
@@ -405,7 +415,8 @@ static void conn_write(struct reactor *r, struct conn *c)
     http_parser_init(&c->parser, &c->req);
     conn_process_input(r, c);
     if (c->state == ST_WRITING) {
-        c->resp_off = 0;
+        c->phase = RSP_HEAD;
+        c->head_off = 0;
         conn_write(r, c); /* try to flush the next response immediately */
         return;
     }
@@ -635,8 +646,11 @@ void reactor_destroy(struct reactor *r)
         if (c) {
             epoll_ctl(r->epfd, EPOLL_CTL_DEL, fd, NULL);
             close(fd);
-            if (c->resp) {
-                free(c->resp);
+            if (c->head) {
+                free(c->head);
+            }
+            if (c->file_fd >= 0) {
+                close(c->file_fd);
             }
             free(c);
         }

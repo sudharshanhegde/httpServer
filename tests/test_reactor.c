@@ -83,7 +83,8 @@ static char *read_response(int fd)
             cap *= 2;
             buf = realloc(buf, cap);
         }
-        ssize_t r = read(fd, buf + n, cap - n);
+        /* Leave room for the trailing NUL at buf[n]. */
+        ssize_t r = read(fd, buf + n, cap - 1 - n);
         if (r <= 0) {
             break; /* EOF or error */
         }
@@ -304,6 +305,60 @@ static void test_concurrent_connections(void)
     }
 }
 
+/*
+ * Checkpoint 6: validate the sendfile() data plane by serving an 8 MiB file
+ * and verifying Content-Length and every body byte match what was written.
+ */
+static void test_large_file_sendfile(void)
+{
+    enum { SIZE = 8 * 1024 * 1024, CHUNK = 8192 };
+    const char *path = "www/big.bin";
+
+    unsigned char chunk[CHUNK];
+    for (size_t i = 0; i < CHUNK; i++) {
+        chunk[i] = (unsigned char)(i * 31 + 7);
+    }
+    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    CHECK(fd >= 0);
+    size_t written = 0;
+    while (written < SIZE) {
+        size_t n = (SIZE - written) < CHUNK ? (SIZE - written) : CHUNK;
+        ssize_t w = write(fd, chunk, n);
+        CHECK(w > 0);
+        written += (size_t)w;
+    }
+    close(fd);
+
+    int sock = tcp_connect();
+    CHECK(sock >= 0);
+    send_all(sock, "GET /big.bin HTTP/1.1\r\nHost: t\r\nConnection: close\r\n\r\n");
+    char *resp = read_response(sock);
+    close(sock);
+    CHECK(resp != NULL);
+    if (resp) {
+        CHECK(strstr(resp, "HTTP/1.1 200 OK") != NULL);
+        char *cl = strstr(resp, "Content-Length:");
+        CHECK(cl != NULL);
+        if (cl) {
+            CHECK((size_t)strtoul(cl + 15, NULL, 10) == SIZE);
+        }
+        /* read_response() returns only once it has hdr_end + Content-Length
+         * bytes, so the body region holds all SIZE bytes. The pattern contains
+         * NUL bytes, so compare against SIZE rather than strlen(). */
+        const char *body = strstr(resp, "\r\n\r\n") + 4;
+        size_t ok = 1;
+        for (size_t i = 0; i < SIZE; i++) {
+            if ((unsigned char)body[i] != (unsigned char)((i * 31 + 7) & 0xff)) {
+                ok = 0;
+                break;
+            }
+        }
+        CHECK(ok == 1);
+    }
+    free(resp);
+    unlink(path);
+}
+
 int main(void)
 {
     start_server();
@@ -316,6 +371,7 @@ int main(void)
     test_malformed_request();
     test_path_traversal_rejected();
     test_concurrent_connections();
+    test_large_file_sendfile();
 
     stop_server();
 
