@@ -27,6 +27,7 @@ struct reactor_config {
     const char *doc_root; /* directory served as "/" (NULL -> "www") */
     int max_events;      /* epoll_wait batch size (0 -> MAX_EVENTS) */
     int backlog;         /* listen() backlog (0 -> BACKLOG) */
+    bool reuse_port;     /* set SO_REUSEPORT so several reactors share one port */
 };
 
 /** Opaque reactor handle. */
@@ -53,6 +54,18 @@ struct reactor *reactor_create(const struct reactor_config *cfg);
  * Returns: the bound port.
  */
 int reactor_port(const struct reactor *r);
+
+/**
+ * reactor_active_connections - Number of live client connections.
+ *
+ * Maintained as an atomic counter, so it is safe to read from another thread
+ * (the worker-pool tuner reads it to decide whether to scale up/down).
+ *
+ * @r: Reactor from reactor_create().
+ *
+ * Returns: the current number of active connections.
+ */
+int reactor_active_connections(const struct reactor *r);
 
 /**
  * reactor_run - Run the event loop until reactor_stop() is called.

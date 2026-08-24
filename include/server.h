@@ -82,26 +82,7 @@ struct client_info {
     time_t last_active;
 };
 
-struct work_queue {
-    struct client_info *jobs;
-    int capacity;
-    int head;
-    int tail;
-    int count;
-    pthread_mutex_t mutex;
-    pthread_cond_t cond;
-};
-
-struct thread_pool {
-    pthread_t *threads;
-    int num_threads;
-    struct work_queue queue;
-    volatile bool shutdown;
-};
-
 extern struct server_config g_config;
-extern struct thread_pool g_pool;
-extern struct lru_cache g_cache;
 extern volatile bool g_shutdown;
 extern FILE *g_log_file;
 
@@ -112,10 +93,6 @@ void log_msg(const char *level, const char *fmt, ...);
 
 void config_load(const char *filename, struct server_config *cfg);
 void config_print(const struct server_config *cfg);
-
-void thread_pool_init(struct thread_pool *pool, int num_threads);
-void thread_pool_destroy(struct thread_pool *pool);
-void thread_pool_enqueue(struct thread_pool *pool, struct client_info *client);
 
 /**
  * enum http_parse_status - Result of feeding bytes into an HTTP parser.

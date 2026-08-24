@@ -11,6 +11,9 @@
  * EPOLLOUT until the whole response is flushed.
  */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 #include "reactor.h"
 
 #include <errno.h>
@@ -61,6 +64,7 @@ struct reactor {
     int port;
     char *doc_root;
     int max_events;
+    int active_conns;    /* atomic: live connections (read by the pool tuner) */
     struct conn **conns; /* indexed by fd */
     volatile bool stop;
 };
@@ -88,6 +92,7 @@ static void conn_close(struct reactor *r, struct conn *c)
     }
     r->conns[c->fd] = NULL;
     free(c);
+    __atomic_sub_fetch(&r->active_conns, 1, __ATOMIC_RELAXED);
 }
 
 /* ---- response building (naive read()+write(); sendfile comes at C6) ------ */
@@ -436,6 +441,7 @@ static void reactor_accept(struct reactor *r)
         c->state = ST_READING;
         http_parser_init(&c->parser, &c->req);
         r->conns[fd] = c;
+        __atomic_add_fetch(&r->active_conns, 1, __ATOMIC_RELAXED);
 
         struct epoll_event ev;
         ev.events = EPOLLIN | EPOLLET;
@@ -503,6 +509,9 @@ struct reactor *reactor_create(const struct reactor_config *cfg)
     }
     int one = 1;
     setsockopt(r->listen_fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
+    if (cfg->reuse_port) {
+        setsockopt(r->listen_fd, SOL_SOCKET, SO_REUSEPORT, &one, sizeof(one));
+    }
 
     struct sockaddr_in sa;
     memset(&sa, 0, sizeof(sa));
@@ -539,6 +548,11 @@ struct reactor *reactor_create(const struct reactor_config *cfg)
 int reactor_port(const struct reactor *r)
 {
     return r->port;
+}
+
+int reactor_active_connections(const struct reactor *r)
+{
+    return __atomic_load_n(&r->active_conns, __ATOMIC_RELAXED);
 }
 
 void reactor_run(struct reactor *r)
