@@ -5,5 +5,6 @@ www/.gitkeep
 tests/bin/test_http_parser
 tests/bin/test_hash_table
 tests/bin/test_lru_cache
+tests/bin/test_reactor
 SKILL.md
 PROGRESS.md

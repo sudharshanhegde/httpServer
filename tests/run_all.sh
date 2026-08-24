@@ -21,7 +21,7 @@ echo "==> Building and running tests..."
 # ---------------------------------------------------------------
 # Checkpoint 1: HTTP/1.1 state-machine parser
 # ---------------------------------------------------------------
-echo "    [1/3] http_parser"
+echo "    [1/4] http_parser"
 CC="${CC:-gcc}"
 "$CC" $WARN_FLAGS $SAN_FLAGS -I"$ROOT/include" \
     "$ROOT/tests/test_http_parser.c" "$ROOT/src/http_parser.c" \
@@ -31,7 +31,7 @@ CC="${CC:-gcc}"
 # ---------------------------------------------------------------
 # Checkpoint 2: generic open-addressing hash table
 # ---------------------------------------------------------------
-echo "    [2/3] hash_table"
+echo "    [2/4] hash_table"
 "$CC" $WARN_FLAGS $SAN_FLAGS -I"$ROOT/src" \
     "$ROOT/tests/test_hash_table.c" "$ROOT/src/hash_table.c" \
     -o "$TEST_BIN_DIR/test_hash_table"
@@ -40,10 +40,19 @@ echo "    [2/3] hash_table"
 # ---------------------------------------------------------------
 # Checkpoint 3: thread-safe LRU cache on the hash table
 # ---------------------------------------------------------------
-echo "    [3/3] lru_cache"
+echo "    [3/4] lru_cache"
 "$CC" $WARN_FLAGS $SAN_FLAGS -D_GNU_SOURCE -pthread -I"$ROOT/src" \
     "$ROOT/tests/test_lru_cache.c" "$ROOT/src/lru_cache.c" "$ROOT/src/hash_table.c" \
     -o "$TEST_BIN_DIR/test_lru_cache"
 "$TEST_BIN_DIR/test_lru_cache"
+
+# ---------------------------------------------------------------
+# Checkpoint 4: edge-triggered epoll reactor (real socket, real client)
+# ---------------------------------------------------------------
+echo "    [4/4] reactor"
+"$CC" $WARN_FLAGS $SAN_FLAGS -D_GNU_SOURCE -pthread -I"$ROOT/include" -I"$ROOT/src" \
+    "$ROOT/tests/test_reactor.c" "$ROOT/src/reactor.c" "$ROOT/src/http_parser.c" \
+    -o "$TEST_BIN_DIR/test_reactor"
+"$TEST_BIN_DIR/test_reactor"
 
 echo "==> All tests passed."

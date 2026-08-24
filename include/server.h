@@ -200,10 +200,6 @@ void file_serve(struct client_info *client, struct http_request *req, struct htt
 void http_send_response(int client_fd, struct http_response *resp, bool head_only);
 const char *mime_type(const char *path);
 
-int server_socket_init(int port);
-int server_accept_client(int server_fd, struct client_info *client);
-void event_loop(int server_fd);
-
 void signal_handler(int sig);
 void setup_signal_handlers(void);
 
